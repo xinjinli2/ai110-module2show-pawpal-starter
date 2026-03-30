@@ -99,4 +99,4 @@ Based on the test results, I would rate the system’s reliability as 5 out of 5
 2. Ensures the total scheduled time does not exceed the owner's time constraint  
 3. Outputs a list of selected tasks along with a basic explanation of the plan  
 
-<a href="/course_images/ai110/demo.png" target="_blank"> <img src='/course_images/ai110/demo.png' title='PawPal App' width='' alt='PawPal App' class='center-block' /> </a>
+<a href="/demo.png" target="_blank"> <img src='/demo.png' title='PawPal App' width='' alt='PawPal App' class='center-block' /> </a>
