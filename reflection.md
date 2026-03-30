@@ -40,6 +40,7 @@ For my initial UML design, I tried to focus on the main objects a user would act
 Our conflict detection is pretty simple right now—we only check if two tasks have the exact same start time, instead of checking whether their durations overlap. So if two tasks are both at 3 PM, we flag a conflict, but if one is 3:00–3:45 and another is 3:30–4:00, we don’t catch that overlap.
 
 This tradeoff makes sense for our case because it keeps the logic much simpler and faster. Most pet owners think in terms of specific times like “feed at 6 PM,” not detailed time ranges, so exact matching aligns with how the app is used. It also avoids adding more complex logic and keeps performance efficient. If we needed more precise scheduling in the future, we could add start and end times and handle overlaps, but for this app, the simpler approach works well.
+
 ---
 
 ## 3. AI Collaboration
