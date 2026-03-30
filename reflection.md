@@ -49,6 +49,16 @@ This tradeoff makes sense for our case because it keeps the logic much simpler a
 - How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
 - What kinds of prompts or questions were most helpful?
 
+I mainly used Copilot for brainstorming the design, writing class structure, and debugging small issues. It was especially helpful when I needed quick suggestions for methods or when I got stuck on logic.
+
+The most useful prompts were things like “help me design a scheduler class” or “why is this function not working.” I also used it to check edge cases and think through test scenarios.
+
+For Copilot specifically, the inline suggestions were the most helpful when writing repetitive code like sorting, filtering, or small helper functions. Chat was more useful for higher-level questions like system design.
+
+One example I didn’t fully accept was when Copilot suggested a more compact “Pythonic” version of my code using defaultdict and list comprehensions. I kept a more explicit version instead because it was easier to read and debug.
+
+Using separate chat sessions for different phases (design, implementation, testing) helped a lot. It kept things organized and made it easier to focus on one part of the project at a time.
+
 **b. Judgment and verification**
 
 - Describe one moment where you did not accept an AI suggestion as-is.
@@ -69,10 +79,16 @@ Overall, I felt that simple and clear code was more valuable here than writing s
 - What behaviors did you test?
 - Why were these tests important?
 
+I wrote a set of tests to make sure the main features of PawPal+ work as expected. The tests cover things like marking tasks as complete or incomplete, making sure the scheduler prioritizes tasks correctly based on priority and available time, and checking that recurring tasks (like daily or weekly ones) generate properly.
+
+I also tested conflict detection to make sure the system gives warnings when tasks overlap in time without crashing. On top of that, I included tests for sorting and filtering tasks, sucsh as organizing them by time or filtering by status or pet. Finally, I added some edge case tests, like handling empty task lists, zero available time, and unusual inputs, to make sure the system behaves reliably in different situations.
+
 **b. Confidence**
 
 - How confident are you that your scheduler works correctly?
 - What edge cases would you test next if you had more time?
+
+Based on the test results, I would rate the system’s reliability as 5 out of 5. All 39 tests passed, including both normal use cases and edge cases, which gives me strong confidence that the core functionality—especially scheduling, recurrence, and conflict handling—is working correctly and consistently.
 
 ---
 
@@ -82,10 +98,18 @@ Overall, I felt that simple and clear code was more valuable here than writing s
 
 - What part of this project are you most satisfied with?
 
+I think the scheduling logic turned out well. It’s simple but works consistently, and I’m happy that it handles priorities, time constraints, and recurring tasks correctly.
+
 **b. What you would improve**
 
 - If you had another iteration, what would you improve or redesign?
 
+
+If I had more time, I would improve the scheduling logic to handle more realistic cases, like overlapping durations or time-of-day preferences. I’d also make the UI more interactive.
+
+
 **c. Key takeaway**
 
 - What is one important thing you learned about designing systems or working with AI on this project?
+
+One key thing I learned is that keeping the system design simple and clear is really important. AI can suggest more complex or “clever” solutions, but it’s better to choose something that is easy to understand and maintain.

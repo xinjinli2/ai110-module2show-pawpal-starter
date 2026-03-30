@@ -49,6 +49,10 @@ def initialize_session_state():
     # Initialize daily plan if it doesn't exist
     if "daily_plan" not in st.session_state:
         st.session_state.daily_plan = None
+    
+    # Initialize conflict warnings if they don't exist
+    if "conflict_warnings" not in st.session_state:
+        st.session_state.conflict_warnings = []
 
 # Call initialization at app start
 initialize_session_state()
@@ -356,6 +360,111 @@ else:
             st.info("No tasks yet. Add one above to get started!")
 
 # ============================================================================
+# TASK VIEWING & FILTERING
+# ============================================================================
+# Use Scheduler methods to sort, filter, and display tasks professionally
+# ============================================================================
+
+if st.session_state.current_pet and len(st.session_state.current_pet.get_tasks()) > 0:
+    st.divider()
+    
+    with st.expander("🔍 View & Filter Tasks", expanded=False):
+        st.markdown("#### Task Organization & Analysis")
+        
+        # Create scheduler for filtering/sorting methods
+        scheduler = Scheduler(
+            st.session_state.owner,
+            st.session_state.current_pet,
+            st.session_state.current_pet.get_tasks()
+        )
+        
+        # Filter options
+        col_filter1, col_filter2 = st.columns(2)
+        
+        with col_filter1:
+            filter_status = st.radio(
+                "Filter by Status:",
+                ["All", "Pending", "Completed"],
+                horizontal=True,
+                key="filter_status_radio"
+            )
+        
+        with col_filter2:
+            sort_option = st.selectbox(
+                "Sort by:",
+                ["Chronological (by time)", "Priority (HIGH → LOW)", "Duration (shortest first)"],
+                key="sort_option_select"
+            )
+        
+        # Apply filters
+        tasks_to_display = st.session_state.current_pet.get_tasks()
+        
+        if filter_status == "Pending":
+            tasks_to_display = scheduler.filter_by_status(tasks_to_display, completed=False)
+        elif filter_status == "Completed":
+            tasks_to_display = scheduler.filter_by_status(tasks_to_display, completed=True)
+        
+        # Apply sorting
+        if sort_option == "Chronological (by time)":
+            tasks_to_display = scheduler.sort_by_time(tasks_to_display)
+        elif sort_option == "Priority (HIGH → LOW)":
+            tasks_to_display = sorted(tasks_to_display, key=lambda t: -t.priority.value)
+        elif sort_option == "Duration (shortest first)":
+            tasks_to_display = sorted(tasks_to_display, key=lambda t: t.duration_minutes)
+        
+        # Display filtered/sorted tasks in a professional table
+        if tasks_to_display:
+            display_data = []
+            for idx, task in enumerate(tasks_to_display, 1):
+                time_str = task.scheduled_time if task.scheduled_time else "Unscheduled"
+                status_icon = "✅" if task.is_completed else "⏳"
+                due_date_str = task.due_date.strftime("%m/%d") if task.due_date else "—"
+                
+                display_data.append({
+                    "#": idx,
+                    "Status": status_icon,
+                    "Task Name": task.task_name,
+                    "Time": time_str,
+                    "Duration (min)": int(task.duration_minutes),
+                    "Priority": task.priority.name,
+                    "Category": task.category.value,
+                    "Recurrence": task.frequency.value,
+                    "Due Date": due_date_str
+                })
+            
+            st.dataframe(
+                display_data,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Status": st.column_config.TextColumn(width="small"),
+                    "Priority": st.column_config.TextColumn(width="small"),
+                    "Task Name": st.column_config.TextColumn(width="large"),
+                }
+            )
+            
+            # Show summary stats
+            col_stat1, col_stat2, col_stat3, col_stat4 = st.columns(4)
+            
+            with col_stat1:
+                pending_count = sum(1 for t in tasks_to_display if not t.is_completed)
+                st.metric("Pending Tasks", pending_count, label_visibility="collapsed")
+            
+            with col_stat2:
+                completed_count = sum(1 for t in tasks_to_display if t.is_completed)
+                st.metric("Completed Tasks", completed_count, label_visibility="collapsed")
+            
+            with col_stat3:
+                total_duration = sum(t.duration_minutes for t in tasks_to_display)
+                st.metric("Total Duration", f"{total_duration}min", label_visibility="collapsed")
+            
+            with col_stat4:
+                recurring_count = sum(1 for t in tasks_to_display if t.frequency.value != "once")
+                st.metric("Recurring", recurring_count, label_visibility="collapsed")
+        else:
+            st.info(f"📭 No tasks match your filter criteria.")
+
+# ============================================================================
 # SCHEDULE GENERATION
 # ============================================================================
 # DATA FLOW: Generate Schedule
@@ -392,21 +501,44 @@ else:
                 st.session_state.current_pet.get_tasks()
             )
             
+            # CONFLICT DETECTION - Get warnings before generating plan
+            all_owner_tasks = st.session_state.owner.get_all_tasks()
+            conflict_warnings = scheduler.detect_time_conflicts(all_owner_tasks)
+            
             # Call Scheduler.generate_daily_plan() method
             # This internally calls: prioritize_tasks(), allocate_tasks(), create_explanation()
             plan = scheduler.generate_daily_plan(f"plan_{st.session_state.current_pet.pet_id}_{date.today().isoformat()}")
             st.session_state.daily_plan = plan
             
+            # Store conflict warnings in session state
+            st.session_state.conflict_warnings = conflict_warnings
+            
             st.success("✓ Schedule generated!")
+            
+            # Display any conflicts immediately
+            if conflict_warnings:
+                st.warning("⚠️ Time conflicts detected!")
+                for warning in conflict_warnings:
+                    st.warning(warning)
 
 # Display the generated plan
 if st.session_state.daily_plan:
     st.markdown("### 📋 Today's Optimized Schedule")
     
     plan = st.session_state.daily_plan
+    scheduler = Scheduler(
+        st.session_state.owner,
+        st.session_state.current_pet,
+        st.session_state.current_pet.get_tasks()
+    )
+    
+    # Display conflict warnings if they exist
+    if "conflict_warnings" in st.session_state and st.session_state.conflict_warnings:
+        for warning_msg in st.session_state.conflict_warnings:
+            st.warning(warning_msg)
     
     # Metrics row
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric(
             "Tasks Scheduled",
@@ -428,24 +560,80 @@ if st.session_state.daily_plan:
             f"{remaining / 60:.1f} hrs",
             status
         )
+    with col4:
+        priority_high = sum(1 for t in plan.get_tasks() if t.priority.name == "HIGH")
+        st.metric(
+            "High Priority",
+            priority_high,
+            "tasks scheduled"
+        )
     
     st.divider()
     
-    # Display scheduled tasks
-    st.markdown("#### Scheduled Tasks in Order")
-    for i, task in enumerate(plan.get_tasks(), 1):
-        status = "✓" if task.is_completed else "⏳"
-        col_task1, col_task2 = st.columns([3, 1])
-        with col_task1:
-            st.write(
-                f"{i}. {status} **{task.task_name}** | "
-                f"{int(task.duration_minutes)} min | "
-                f"{task.priority.name} priority | "
-                f"_{task.category.value}_"
-            )
-        with col_task2:
-            if st.button("Details", key=f"details_{task.task_id}", use_container_width=True):
-                st.info(task.get_details())
+    # SORTED TASKS VIEW - Use sort_by_time() for chronological display
+    st.markdown("#### ⏰ Tasks in Chronological Order")
+    sorted_tasks = scheduler.sort_by_time(plan.get_tasks())
+    
+    if sorted_tasks:
+        schedule_data = []
+        for i, task in enumerate(sorted_tasks, 1):
+            status = "✅ Done" if task.is_completed else "⏳ Pending"
+            time_str = task.scheduled_time if task.scheduled_time else "Unscheduled"
+            
+            schedule_data.append({
+                "#": i,
+                "Task": task.task_name,
+                "Time": time_str,
+                "Duration": f"{int(task.duration_minutes)} min",
+                "Priority": task.priority.name,
+                "Category": task.category.value,
+                "Status": status
+            })
+        
+        st.dataframe(
+            schedule_data,
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                "Priority": st.column_config.TextColumn(width="small"),
+                "Status": st.column_config.TextColumn(width="small"),
+                "Task": st.column_config.TextColumn(width="large"),
+            }
+        )
+    
+    st.divider()
+    
+    # FILTERED VIEWS - Show different perspectives
+    col_view1, col_view2 = st.columns(2)
+    
+    with col_view1:
+        st.markdown("#### 🎯 High Priority Tasks")
+        high_priority = scheduler.filter_by_status(
+            [t for t in plan.get_tasks() if t.priority.name == "HIGH"],
+            completed=False
+        )
+        if high_priority:
+            for task in high_priority:
+                st.success(f"✓ **{task.task_name}** ({task.duration_minutes} min)")
+        else:
+            st.info("No high-priority tasks scheduled today.")
+    
+    with col_view2:
+        st.markdown("#### 📋 By Category")
+        categories = {}
+        for task in plan.get_tasks():
+            cat = task.category.value
+            if cat not in categories:
+                categories[cat] = []
+            categories[cat].append(task)
+        
+        if categories:
+            for category, tasks in sorted(categories.items()):
+                st.write(f"**{category.capitalize()}** ({len(tasks)} tasks)")
+                for task in tasks:
+                    st.caption(f"  • {task.task_name} ({task.duration_minutes} min)")
+        else:
+            st.info("No tasks by category.")
     
     st.divider()
     
