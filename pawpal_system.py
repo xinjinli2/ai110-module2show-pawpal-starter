@@ -12,6 +12,7 @@ class Priority(Enum):
     HIGH = 3
     
     def __lt__(self, other):
+        
         """Compare if this priority is less than another priority."""
         if not isinstance(other, Priority):
             return NotImplemented

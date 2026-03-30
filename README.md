@@ -22,10 +22,6 @@ Your final app should:
 - Display the plan clearly (and ideally explain the reasoning)
 - Include tests for the most important scheduling behaviors
 
-## Smarter Scheduling
-
-Beyond the basics, PawPal+ now features intelligent scheduling that makes planning seamless. Tasks sort automatically by time so you can see your pet's day at a glance. You can filter tasks by status or pet to focus on what matters most, and recurring tasks like daily feeding automatically create the next day's schedule. Built-in conflict detection gently warns you if two tasks accidentally land at the same time—no crashes, just helpful guidance to keep your pet's routine smooth and organized.
-
 ## Getting started
 
 ### Setup
@@ -45,3 +41,18 @@ pip install -r requirements.txt
 5. Add tests to verify key behaviors.
 6. Connect your logic to the Streamlit UI in `app.py`.
 7. Refine UML so it matches what you actually built.
+
+
+## Smarter Scheduling
+
+Beyond the basics, PawPal+ also includes some smarter scheduling features that make planning feel more effortless. Tasks are automatically sorted by time, so it’s easy to see your pet’s day at a glance. You can filter tasks by status or by pet to focus on what matters most, and recurring tasks like daily feeding will automatically carry over to the next day.
+
+There’s also simple conflict detection built in. It warns you if two tasks end up at the same time. It doesn’t interrupt anything, just gives helpful feedback to keep your pet’s routine organized and running smoothly.
+
+# Testing PawPal+
+
+I wrote a set of tests to make sure the main features of PawPal+ work as expected. The tests cover things like marking tasks as complete or incomplete, making sure the scheduler prioritizes tasks correctly based on priority and available time, and checking that recurring tasks (like daily or weekly ones) generate properly.
+
+I also tested conflict detection to make sure the system gives warnings when tasks overlap in time without crashing. On top of that, I included tests for sorting and filtering tasks, such as organizing them by time or filtering by status or pet. Finally, I added some edge case tests, like handling empty task lists, zero available time, and unusual inputs, to make sure the system behaves reliably in different situations.
+
+Based on the test results, I would rate the system’s reliability as 5 out of 5. All 39 tests passed, including both normal use cases and edge cases, which gives me strong confidence that the core functionality—especially scheduling, recurrence, and conflict handling—is working correctly and consistently.
