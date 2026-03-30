@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Optional
-from datetime import date
+from datetime import date, timedelta
 from enum import Enum
 
 
@@ -34,6 +34,13 @@ class Priority(Enum):
         if not isinstance(other, Priority):
             return NotImplemented
         return self.value >= other.value
+
+
+class TaskFrequency(Enum):
+    """Frequency/recurrence patterns for tasks."""
+    ONCE = "once"  # One-time task
+    DAILY = "daily"  # Repeats every day
+    WEEKLY = "weekly"  # Repeats every 7 days
 
 
 class TaskCategory(Enum):
@@ -89,7 +96,7 @@ class Pet:
 
 @dataclass
 class Task:
-    """Represents a single pet care task."""
+    """Represents a single pet care task with optional recurrence."""
     task_id: str
     pet_id: str  # Links task to a specific pet
     task_name: str
@@ -97,6 +104,11 @@ class Task:
     priority: Priority
     category: TaskCategory
     is_completed: bool = False
+    scheduled_time: Optional[str] = None  # Time in HH:MM format (e.g., "14:30")
+    frequency: TaskFrequency = TaskFrequency.ONCE  # Recurrence pattern: ONCE, DAILY, or WEEKLY
+    due_date: Optional[date] = None  # Next due date for recurring tasks
+    last_completed_date: Optional[date] = None  # When this task was last completed
+    parent_task_id: Optional[str] = None  # Links to parent recurring task for lineage tracking
     
     def __post_init__(self) -> None:
         """Validate that task duration is positive."""
@@ -113,28 +125,127 @@ class Task:
         self.category = category
     
     def mark_complete(self) -> None:
-        """Mark the task as completed."""
+        """Mark the task as completed and record completion timestamp."""
         self.is_completed = True
+        self.last_completed_date = date.today()
     
     def mark_incomplete(self) -> None:
-        """Mark the task as incomplete."""
+        """Mark the task as incomplete (clears completion date)."""
         self.is_completed = False
+        self.last_completed_date = None
     
     def display_task(self) -> str:
-        """Display task information."""
+        """Display task information with recurrence indicator."""
         status = "✓ Completed" if self.is_completed else "○ Pending"
-        return f"[{status}] {self.task_name} ({self.duration_minutes} min, {self.priority.name})"
+        time_info = f" @ {self.scheduled_time}" if self.scheduled_time else ""
+        frequency_info = f" [{self.frequency.value}]" if self.frequency != TaskFrequency.ONCE else ""
+        return f"[{status}] {self.task_name} ({self.duration_minutes} min, {self.priority.name}){frequency_info}{time_info}"
     
     def get_details(self) -> str:
         """Return a detailed description of the task."""
         status = "Completed" if self.is_completed else "Pending"
-        return (
+        details = (
             f"Task: {self.task_name}\n"
             f"Category: {self.category.value}\n"
             f"Duration: {self.duration_minutes} minutes\n"
             f"Priority: {self.priority.name}\n"
-            f"Status: {status}"
+            f"Status: {status}\n"
+            f"Frequency: {self.frequency.value}"
         )
+        if self.due_date:
+            details += f"\nDue Date: {self.due_date.isoformat()}"
+        if self.last_completed_date:
+            details += f"\nLast Completed: {self.last_completed_date.isoformat()}"
+        return details
+
+
+class RecurringTaskManager:
+    """Manages the creation and lifecycle of recurring task instances."""
+    
+    @staticmethod
+    def create_next_occurrence(task: Task, pet: Pet) -> Optional[Task]:
+        """Create the next occurrence of a recurring task using timedelta.
+        
+        Args:
+            task: The completed recurring task
+            pet: The pet that owns this task
+        
+        Returns:
+            A new Task instance for the next occurrence, or None if task is not recurring
+        
+        Algorithm:
+            1. Check if task is recurring (frequency != ONCE)
+            2. Calculate next due date based on frequency using timedelta:
+               - DAILY: today + timedelta(days=1)
+               - WEEKLY: today + timedelta(days=7)
+            3. Create new Task instance with incremented task_id
+            4. Link to parent task via parent_task_id for lineage tracking
+        """
+        if task.frequency == TaskFrequency.ONCE:
+            return None  # One-time tasks don't recur
+        
+        # Calculate next due date using timedelta based on frequency
+        today = date.today()
+        if task.frequency == TaskFrequency.DAILY:
+            next_due = today + timedelta(days=1)  # Tomorrow
+        elif task.frequency == TaskFrequency.WEEKLY:
+            next_due = today + timedelta(days=7)  # Same day next week
+        else:
+            return None
+        
+        # Create new task instance with incremented ID
+        task_counter = int(task.task_id.lstrip('t')) + 1 if task.task_id.startswith('t') else 1
+        next_task_id = f"t{task_counter}"
+        
+        # Create new task for next occurrence
+        next_task = Task(
+            task_id=next_task_id,
+            pet_id=task.pet_id,
+            task_name=task.task_name,
+            duration_minutes=task.duration_minutes,
+            priority=task.priority,
+            category=task.category,
+            is_completed=False,
+            scheduled_time=task.scheduled_time,
+            frequency=task.frequency,
+            due_date=next_due,
+            last_completed_date=None,
+            parent_task_id=task.task_id  # Track lineage
+        )
+        
+        return next_task
+    
+    @staticmethod
+    def handle_recurring_completion(task: Task, pet: Pet, owner: Owner) -> Optional[Task]:
+        """Handle task completion for recurring tasks - auto-generate next occurrence.
+        
+        This is the main entry point when a task is marked complete.
+        It checks if the task is recurring and automatically adds the next occurrence.
+        
+        Args:
+            task: The task being marked complete
+            pet: The pet that owns this task
+            owner: The owner for context
+        
+        Returns:
+            The newly created next task instance, or None if not recurring
+        """
+        # Mark the current task as complete
+        task.mark_complete()
+        
+        # If not recurring, nothing more to do
+        if task.frequency == TaskFrequency.ONCE:
+            return None
+        
+        # Create next occurrence
+        next_task = RecurringTaskManager.create_next_occurrence(task, pet)
+        
+        if next_task:
+            # Automatically add next task to pet's task list
+            pet.add_task(next_task)
+            return next_task
+        
+        return None
 
 
 class Owner:
@@ -173,6 +284,22 @@ class Owner:
         for pet in self.pets:
             all_tasks.extend(pet.get_tasks())
         return all_tasks
+    
+    def get_pending_tasks_for_date(self, target_date: date) -> List[Task]:
+        """Get all pending tasks that are due on the specified date.
+        
+        Args:
+            target_date: The date to filter tasks for (e.g., today)
+        
+        Returns:
+            List of pending tasks with due_date <= target_date
+        """
+        all_tasks = self.get_all_tasks()
+        pending = [t for t in all_tasks if not t.is_completed]
+        
+        # For tasks without explicit due_date, treat as always available
+        due_tasks = [t for t in pending if t.due_date is None or t.due_date <= target_date]
+        return due_tasks
     
     def set_pet(self, pet: Pet) -> None:
         """Associate a pet with this owner (sets first pet for backward compatibility)."""
@@ -265,6 +392,73 @@ class Scheduler:
         self.owner = owner
         self.pet = pet
         self.available_tasks = available_tasks
+        self.conflict_warnings: List[str] = []  # Store conflict warnings
+    
+    def detect_time_conflicts(self, tasks: List[Task]) -> List[str]:
+        """Detect and return warnings for tasks scheduled at the same time.
+        
+        Lightweight conflict detection strategy:
+        1. Group tasks by scheduled_time
+        2. Identify groups with multiple tasks
+        3. Return friendly warning messages (no exceptions/crashes)
+        
+        Args:
+            tasks: List of tasks to check for conflicts
+        
+        Returns:
+            List of warning messages (empty if no conflicts)
+        
+        Algorithm:
+            • O(n) time complexity - single pass through tasks
+            • Groups tasks by scheduled_time using dictionary
+            • Identifies conflicts when group size > 1
+            • Returns warnings without modifying tasks
+        """
+        warnings = []
+        
+        # Skip if no tasks or only one task
+        if len(tasks) <= 1:
+            return warnings
+        
+        # Group tasks by scheduled_time using a dictionary
+        time_groups = {}
+        for task in tasks:
+            if task.scheduled_time:  # Only check tasks with explicit times
+                if task.scheduled_time not in time_groups:
+                    time_groups[task.scheduled_time] = []
+                time_groups[task.scheduled_time].append(task)
+        
+        # Detect conflicts (multiple tasks at same time)
+        for scheduled_time, conflicting_tasks in time_groups.items():
+            if len(conflicting_tasks) > 1:
+                # Found a conflict! Generate warning message
+                task_names = [f"{t.task_name} ({t.pet_id})" for t in conflicting_tasks]
+                conflict_msg = (
+                    f"⚠️  TIME CONFLICT at {scheduled_time}: "
+                    f"{len(conflicting_tasks)} tasks scheduled simultaneously. "
+                    f"Tasks: {', '.join(task_names)}"
+                )
+                warnings.append(conflict_msg)
+        
+        # Store warnings in instance for later retrieval
+        self.conflict_warnings = warnings
+        return warnings
+    
+    def get_conflict_warnings(self) -> List[str]:
+        """Get stored conflict warnings from last detection run.
+        
+        Returns:
+            List of warning strings (empty if no conflicts found)
+        """
+        return self.conflict_warnings
+    
+    def has_conflicts(self) -> bool:
+        """Check if any conflicts were detected.
+        
+        Returns:
+            True if conflicts exist, False otherwise
+        """
+        return len(self.conflict_warnings) > 0
     
     def generate_daily_plan(self, plan_id: str) -> DailyPlan:
         """Generate a daily care plan based on owner time and task priorities."""
@@ -276,6 +470,10 @@ class Scheduler:
         
         # Allocate tasks that fit within constraints
         selected_tasks = self.allocate_tasks(available_time_minutes)
+        
+        # DETECT TIME CONFLICTS (lightweight, no exceptions)
+        all_owner_tasks = self.owner.get_all_tasks()
+        self.detect_time_conflicts(all_owner_tasks)
         
         # Create the daily plan
         plan = DailyPlan(
@@ -322,6 +520,51 @@ class Scheduler:
                 total_time += task.duration_minutes
         
         return allocated
+    
+    def sort_by_time(self, tasks: List[Task]) -> List[Task]:
+        """Sort tasks by scheduled time in HH:MM format using lambda as a key function.
+        
+        Uses a lambda that converts HH:MM strings to comparable tuples (hours, minutes).
+        Tasks without a scheduled time are placed at the end.
+        """
+        def time_to_tuple(time_str: Optional[str]) -> tuple:
+            """Convert HH:MM format to (hours, minutes) tuple for sorting."""
+            if time_str is None:
+                return (24, 0)  # Place unscheduled tasks at the end
+            try:
+                hours, minutes = map(int, time_str.split(':'))
+                return (hours, minutes)
+            except (ValueError, AttributeError):
+                return (24, 0)  # Invalid format goes to end
+        
+        # Sort using lambda with the time_to_tuple converter
+        return sorted(tasks, key=lambda task: time_to_tuple(task.scheduled_time))
+    
+    def filter_by_status(self, tasks: List[Task], completed: bool) -> List[Task]:
+        """Filter tasks by completion status.
+        
+        Args:
+            tasks: List of tasks to filter
+            completed: If True, return completed tasks; if False, return pending tasks
+        
+        Returns:
+            Filtered list of tasks matching the completion status
+        """
+        return [t for t in tasks if t.is_completed == completed]
+    
+    def filter_by_pet(self, tasks: List[Task], pet_name: str) -> List[Task]:
+        """Filter tasks by pet name.
+        
+        Args:
+            tasks: List of tasks to filter
+            pet_name: Name of the pet to filter by
+        
+        Returns:
+            Filtered list of tasks belonging to the specified pet
+        """
+        # Match tasks whose pet_id matches a pet with the given name
+        matching_pet_ids = [p.pet_id for p in self.owner.get_pets() if p.name.lower() == pet_name.lower()]
+        return [t for t in tasks if t.pet_id in matching_pet_ids]
     
     def create_explanation(self, selected_tasks: List[Task]) -> str:
         """Create a human-readable explanation for why these tasks were selected."""

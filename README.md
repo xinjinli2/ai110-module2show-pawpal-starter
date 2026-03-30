@@ -22,6 +22,10 @@ Your final app should:
 - Display the plan clearly (and ideally explain the reasoning)
 - Include tests for the most important scheduling behaviors
 
+## Smarter Scheduling
+
+Beyond the basics, PawPal+ now features intelligent scheduling that makes planning seamless. Tasks sort automatically by time so you can see your pet's day at a glance. You can filter tasks by status or pet to focus on what matters most, and recurring tasks like daily feeding automatically create the next day's schedule. Built-in conflict detection gently warns you if two tasks accidentally land at the same time—no crashes, just helpful guidance to keep your pet's routine smooth and organized.
+
 ## Getting started
 
 ### Setup
